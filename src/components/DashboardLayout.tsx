@@ -41,7 +41,7 @@ const DashboardLayout = ({ children }: { children: ReactNode }) => {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
-  const { signOut, profile } = useAuth();
+  const { signOut, profile, hasRole } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
