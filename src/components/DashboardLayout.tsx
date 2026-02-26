@@ -11,6 +11,7 @@ import {
   GraduationCap,
   BarChart3,
   Settings,
+  ShieldCheck,
   LogOut,
   ChevronLeft,
   Menu,
@@ -33,13 +34,14 @@ const navItems = [
   { icon: GraduationCap, label: "Training", href: "/training" },
   { icon: BarChart3, label: "Reports", href: "/reports" },
   { icon: Settings, label: "Settings", href: "/settings" },
+  { icon: ShieldCheck, label: "Admin", href: "/admin" },
 ];
 
 const DashboardLayout = ({ children }: { children: ReactNode }) => {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
-  const { signOut, profile } = useAuth();
+  const { signOut, profile, hasRole } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
@@ -78,7 +80,9 @@ const DashboardLayout = ({ children }: { children: ReactNode }) => {
         </div>
 
         <nav className="flex-1 space-y-1 px-3 py-4">
-          {navItems.map((item) => {
+          {navItems
+            .filter((item) => item.href !== "/admin" || hasRole("admin"))
+            .map((item) => {
             const isActive = location.pathname === item.href;
             return (
               <Link
