@@ -80,7 +80,9 @@ const DashboardLayout = ({ children }: { children: ReactNode }) => {
         </div>
 
         <nav className="flex-1 space-y-1 px-3 py-4">
-          {navItems.map((item) => {
+          {navItems
+            .filter((item) => item.href !== "/admin" || hasRole("admin"))
+            .map((item) => {
             const isActive = location.pathname === item.href;
             return (
               <Link
