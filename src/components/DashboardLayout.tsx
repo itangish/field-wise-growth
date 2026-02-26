@@ -11,6 +11,7 @@ import {
   GraduationCap,
   BarChart3,
   Settings,
+  ShieldCheck,
   LogOut,
   ChevronLeft,
   Menu,
@@ -33,6 +34,7 @@ const navItems = [
   { icon: GraduationCap, label: "Training", href: "/training" },
   { icon: BarChart3, label: "Reports", href: "/reports" },
   { icon: Settings, label: "Settings", href: "/settings" },
+  { icon: ShieldCheck, label: "Admin", href: "/admin" },
 ];
 
 const DashboardLayout = ({ children }: { children: ReactNode }) => {
