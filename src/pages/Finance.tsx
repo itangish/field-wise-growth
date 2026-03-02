@@ -1,74 +1,89 @@
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import DashboardLayout from "@/components/DashboardLayout";
 import StatCard from "@/components/StatCard";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { motion } from "framer-motion";
 import {
-  DollarSign,
-  TrendingUp,
-  TrendingDown,
-  Wallet,
-  ArrowUpRight,
-  ArrowDownRight,
-  CreditCard,
-  PiggyBank,
-  Receipt,
+  DollarSign, TrendingUp, Wallet, ArrowUpRight, ArrowDownRight, PiggyBank, Receipt, Plus,
 } from "lucide-react";
 import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  BarChart,
-  Bar,
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar,
 } from "recharts";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { toast } from "@/hooks/use-toast";
 
-const revenueData = [
-  { month: "Jan", income: 4200, expenses: 2800 },
-  { month: "Feb", income: 3800, expenses: 2600 },
-  { month: "Mar", income: 5100, expenses: 3200 },
-  { month: "Apr", income: 4700, expenses: 2900 },
-  { month: "May", income: 5600, expenses: 3100 },
-  { month: "Jun", income: 6200, expenses: 3400 },
-  { month: "Jul", income: 7100, expenses: 3800 },
-  { month: "Aug", income: 6800, expenses: 3600 },
-  { month: "Sep", income: 7500, expenses: 4000 },
-  { month: "Oct", income: 8200, expenses: 4200 },
-  { month: "Nov", income: 7900, expenses: 4100 },
-  { month: "Dec", income: 8600, expenses: 4400 },
-];
-
-const expenseBreakdown = [
-  { category: "Seeds", amount: 12400 },
-  { category: "Fertilizer", amount: 9800 },
-  { category: "Labor", amount: 18200 },
-  { category: "Equipment", amount: 7600 },
-  { category: "Transport", amount: 5400 },
-  { category: "Storage", amount: 3200 },
-];
-
-const transactions = [
-  { id: 1, desc: "Maize sale — Buyer K. Mugabo", amount: "+2,400,000 RWF", type: "income", date: "Today", method: "Mobile Money" },
-  { id: 2, desc: "Fertilizer purchase — AgriSupply Ltd", amount: "-580,000 RWF", type: "expense", date: "Yesterday", method: "Bank Transfer" },
-  { id: 3, desc: "Rice harvest — Musanze District", amount: "+3,100,000 RWF", type: "income", date: "Feb 14", method: "Bank Transfer" },
-  { id: 4, desc: "Seasonal labor wages — 12 workers", amount: "-1,200,000 RWF", type: "expense", date: "Feb 13", method: "Mobile Money" },
-  { id: 5, desc: "Cassava sale — Export order", amount: "+5,800,000 RWF", type: "income", date: "Feb 12", method: "Bank Transfer" },
-  { id: 6, desc: "Pesticide order — CropGuard Inc.", amount: "-340,000 RWF", type: "expense", date: "Feb 11", method: "Mobile Money" },
-  { id: 7, desc: "Government subsidy — Season A", amount: "+1,500,000 RWF", type: "income", date: "Feb 10", method: "Bank Transfer" },
-];
-
-const taxSummary = [
-  { label: "Gross Revenue", value: "86,400,000 RWF" },
-  { label: "Deductible Expenses", value: "42,100,000 RWF" },
-  { label: "Taxable Income", value: "44,300,000 RWF" },
-  { label: "Estimated Tax (15%)", value: "6,645,000 RWF" },
-];
+const txCategories = ["Sales", "Seeds", "Fertilizer", "Labor", "Equipment", "Transport", "Storage", "Subsidy", "Other"];
 
 const Finance = () => {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({ type: "income", category: "Sales", amount: "", description: "" });
+
+  const { data: transactions = [], isLoading } = useQuery({
+    queryKey: ["transactions"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("transactions").select("*").order("created_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const createTx = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from("transactions").insert({
+        user_id: user!.id,
+        type: form.type,
+        category: form.category,
+        amount: parseFloat(form.amount),
+        description: form.description || null,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      setOpen(false);
+      setForm({ type: "income", category: "Sales", amount: "", description: "" });
+      toast({ title: "Transaction recorded" });
+    },
+    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+  });
+
+  const totalIncome = transactions.filter((t) => t.type === "income").reduce((s, t) => s + t.amount, 0);
+  const totalExpenses = transactions.filter((t) => t.type === "expense").reduce((s, t) => s + t.amount, 0);
+  const netProfit = totalIncome - totalExpenses;
+
+  // Group by category for chart
+  const expenseByCategory = transactions.filter((t) => t.type === "expense").reduce<Record<string, number>>((acc, t) => {
+    acc[t.category] = (acc[t.category] || 0) + t.amount;
+    return acc;
+  }, {});
+  const expenseChartData = Object.entries(expenseByCategory).map(([category, amount]) => ({ category, amount }));
+
+  // Group by month for trend
+  const monthlyData = transactions.reduce<Record<string, { income: number; expenses: number }>>((acc, t) => {
+    const month = new Date(t.created_at).toLocaleString("default", { month: "short" });
+    if (!acc[month]) acc[month] = { income: 0, expenses: 0 };
+    if (t.type === "income") acc[month].income += t.amount;
+    else acc[month].expenses += t.amount;
+    return acc;
+  }, {});
+  const revenueData = Object.entries(monthlyData).map(([month, d]) => ({ month, ...d }));
+
+  const fmt = (n: number) => {
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M RWF`;
+    if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K RWF`;
+    return `${n.toLocaleString()} RWF`;
+  };
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -77,180 +92,120 @@ const Finance = () => {
             <h1 className="font-display text-2xl font-bold text-foreground">Finance & Tax</h1>
             <p className="text-muted-foreground">Income, expenses, profit analysis & tax overview</p>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm">
-              <Receipt className="mr-1.5 h-4 w-4" />
-              Export Report
-            </Button>
-            <Button size="sm">
-              <DollarSign className="mr-1.5 h-4 w-4" />
-              Record Transaction
-            </Button>
-          </div>
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild><Button size="sm"><Plus className="mr-1.5 h-4 w-4" />Record Transaction</Button></DialogTrigger>
+            <DialogContent>
+              <DialogHeader><DialogTitle>Record Transaction</DialogTitle></DialogHeader>
+              <div className="grid gap-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Type</Label>
+                    <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="income">Income</SelectItem>
+                        <SelectItem value="expense">Expense</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Category</Label>
+                    <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>{txCategories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="space-y-2"><Label>Amount (RWF) *</Label><Input type="number" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></div>
+                <div className="space-y-2"><Label>Description</Label><Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
+                <Button onClick={() => createTx.mutate()} disabled={!form.amount || createTx.isPending}>
+                  {createTx.isPending ? "Saving…" : "Record Transaction"}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
 
-        {/* Stats */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard icon={<DollarSign className="h-5 w-5" />} label="Total Revenue" value="86.4M RWF" change="+18%" changePositive delay={0} />
-          <StatCard icon={<Wallet className="h-5 w-5" />} label="Total Expenses" value="42.1M RWF" change="+6%" changePositive={false} delay={0.1} />
-          <StatCard icon={<TrendingUp className="h-5 w-5" />} label="Net Profit" value="44.3M RWF" change="+27%" changePositive delay={0.2} />
-          <StatCard icon={<PiggyBank className="h-5 w-5" />} label="Tax Liability" value="6.6M RWF" change="-2%" changePositive delay={0.3} />
+          <StatCard icon={<DollarSign className="h-5 w-5" />} label="Total Revenue" value={fmt(totalIncome)} delay={0} />
+          <StatCard icon={<Wallet className="h-5 w-5" />} label="Total Expenses" value={fmt(totalExpenses)} delay={0.1} />
+          <StatCard icon={<TrendingUp className="h-5 w-5" />} label="Net Profit" value={fmt(netProfit)} delay={0.2} />
+          <StatCard icon={<PiggyBank className="h-5 w-5" />} label="Transactions" value={String(transactions.length)} delay={0.3} />
         </div>
 
-        {/* Revenue vs Expenses Chart */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="rounded-xl border border-border bg-card p-5 shadow-card"
-        >
-          <h3 className="font-display text-base font-bold text-card-foreground">Revenue vs Expenses</h3>
-          <p className="text-sm text-muted-foreground">Monthly comparison (thousands RWF)</p>
-          <div className="mt-4 h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={revenueData}>
-                <defs>
-                  <linearGradient id="incomeGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="hsl(145, 45%, 22%)" stopOpacity={0.3} />
-                    <stop offset="100%" stopColor="hsl(145, 45%, 22%)" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="expenseGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="hsl(42, 70%, 55%)" stopOpacity={0.3} />
-                    <stop offset="100%" stopColor="hsl(42, 70%, 55%)" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(40, 15%, 88%)" />
-                <XAxis dataKey="month" tick={{ fontSize: 12 }} stroke="hsl(150, 10%, 45%)" />
-                <YAxis tick={{ fontSize: 12 }} stroke="hsl(150, 10%, 45%)" />
-                <Tooltip contentStyle={{ borderRadius: "8px", border: "1px solid hsl(40, 15%, 88%)", boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }} />
-                <Area type="monotone" dataKey="income" stroke="hsl(145, 45%, 22%)" strokeWidth={2} fill="url(#incomeGrad)" name="Income" />
-                <Area type="monotone" dataKey="expenses" stroke="hsl(42, 70%, 55%)" strokeWidth={2} fill="url(#expenseGrad)" name="Expenses" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </motion.div>
+        {revenueData.length > 0 && (
+          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="rounded-xl border border-border bg-card p-5 shadow-card">
+            <h3 className="font-display text-base font-bold text-card-foreground">Revenue vs Expenses</h3>
+            <div className="mt-4 h-72">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={revenueData}>
+                  <defs>
+                    <linearGradient id="incomeGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="hsl(145, 45%, 22%)" stopOpacity={0.3} />
+                      <stop offset="100%" stopColor="hsl(145, 45%, 22%)" stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="expenseGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="hsl(42, 70%, 55%)" stopOpacity={0.3} />
+                      <stop offset="100%" stopColor="hsl(42, 70%, 55%)" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(40, 15%, 88%)" />
+                  <XAxis dataKey="month" tick={{ fontSize: 12 }} stroke="hsl(150, 10%, 45%)" />
+                  <YAxis tick={{ fontSize: 12 }} stroke="hsl(150, 10%, 45%)" />
+                  <Tooltip contentStyle={{ borderRadius: "8px", border: "1px solid hsl(40, 15%, 88%)" }} />
+                  <Area type="monotone" dataKey="income" stroke="hsl(145, 45%, 22%)" strokeWidth={2} fill="url(#incomeGrad)" name="Income" />
+                  <Area type="monotone" dataKey="expenses" stroke="hsl(42, 70%, 55%)" strokeWidth={2} fill="url(#expenseGrad)" name="Expenses" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </motion.div>
+        )}
 
-        <div className="grid gap-6 lg:grid-cols-3">
-          {/* Expense Breakdown */}
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.25 }}
-            className="rounded-xl border border-border bg-card p-5 shadow-card"
-          >
+        {expenseChartData.length > 0 && (
+          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }} className="rounded-xl border border-border bg-card p-5 shadow-card">
             <h3 className="font-display text-base font-bold text-card-foreground">Expense Breakdown</h3>
-            <p className="text-sm text-muted-foreground">By category (thousands RWF)</p>
             <div className="mt-4 h-56">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={expenseBreakdown} layout="vertical">
+                <BarChart data={expenseChartData} layout="vertical">
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(40, 15%, 88%)" />
                   <XAxis type="number" tick={{ fontSize: 11 }} stroke="hsl(150, 10%, 45%)" />
                   <YAxis dataKey="category" type="category" tick={{ fontSize: 11 }} stroke="hsl(150, 10%, 45%)" width={70} />
-                  <Tooltip contentStyle={{ borderRadius: "8px", border: "1px solid hsl(40, 15%, 88%)" }} />
+                  <Tooltip contentStyle={{ borderRadius: "8px" }} />
                   <Bar dataKey="amount" fill="hsl(42, 70%, 55%)" radius={[0, 4, 4, 0]} name="Amount" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           </motion.div>
-
-          {/* Tax Summary */}
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="rounded-xl border border-border bg-card p-5 shadow-card lg:col-span-2"
-          >
-            <Tabs defaultValue="tax">
-              <div className="flex items-center justify-between">
-                <h3 className="font-display text-base font-bold text-card-foreground">Financial Summary</h3>
-                <TabsList>
-                  <TabsTrigger value="tax">Tax Overview</TabsTrigger>
-                  <TabsTrigger value="payments">Payment Methods</TabsTrigger>
-                </TabsList>
-              </div>
-
-              <TabsContent value="tax" className="mt-4">
-                <div className="space-y-3">
-                  {taxSummary.map((item, i) => (
-                    <div key={item.label} className="flex items-center justify-between rounded-lg bg-muted/50 px-4 py-3">
-                      <span className="text-sm text-muted-foreground">{item.label}</span>
-                      <span className={`text-sm font-semibold ${i === taxSummary.length - 1 ? "text-secondary" : "text-card-foreground"}`}>
-                        {item.value}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-4 rounded-lg border border-border bg-accent/30 p-4">
-                  <p className="text-xs text-muted-foreground">
-                    💡 <strong>Tax Tip:</strong> You can deduct equipment depreciation and certified organic inputs to reduce taxable income. Consult the national agriculture tax guide for eligible deductions.
-                  </p>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="payments" className="mt-4">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {[
-                    { method: "Mobile Money (MTN)", balance: "12,400,000 RWF", icon: <CreditCard className="h-5 w-5" />, status: "Connected" },
-                    { method: "Bank of Kigali", balance: "28,600,000 RWF", icon: <Wallet className="h-5 w-5" />, status: "Connected" },
-                    { method: "Airtel Money", balance: "3,200,000 RWF", icon: <CreditCard className="h-5 w-5" />, status: "Connected" },
-                    { method: "I&M Bank", balance: "—", icon: <Wallet className="h-5 w-5" />, status: "Not linked" },
-                  ].map((pm) => (
-                    <div key={pm.method} className="flex items-center gap-3 rounded-lg bg-muted/50 p-4">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent text-accent-foreground">
-                        {pm.icon}
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-card-foreground">{pm.method}</p>
-                        <p className="text-xs text-muted-foreground">{pm.balance}</p>
-                      </div>
-                      <Badge variant={pm.status === "Connected" ? "default" : "secondary"} className="text-xs">
-                        {pm.status}
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-              </TabsContent>
-            </Tabs>
-          </motion.div>
-        </div>
+        )}
 
         {/* Recent Transactions */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.35 }}
-          className="rounded-xl border border-border bg-card p-5 shadow-card"
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-display text-base font-bold text-card-foreground">Recent Transactions</h3>
-              <p className="text-sm text-muted-foreground">Latest financial activity</p>
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }} className="rounded-xl border border-border bg-card p-5 shadow-card">
+          <h3 className="font-display text-base font-bold text-card-foreground">Recent Transactions</h3>
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8"><div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>
+          ) : transactions.length === 0 ? (
+            <p className="py-8 text-center text-muted-foreground">No transactions yet. Record your first transaction above.</p>
+          ) : (
+            <div className="mt-4 space-y-2">
+              {transactions.slice(0, 10).map((tx) => (
+                <div key={tx.id} className="flex items-center gap-3 rounded-lg px-4 py-3 transition-colors hover:bg-muted/50">
+                  <div className={`flex h-9 w-9 items-center justify-center rounded-full ${tx.type === "income" ? "bg-success/10" : "bg-destructive/10"}`}>
+                    {tx.type === "income" ? <ArrowUpRight className="h-4 w-4 text-success" /> : <ArrowDownRight className="h-4 w-4 text-destructive" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="truncate text-sm font-medium text-card-foreground">{tx.description || tx.category}</p>
+                    <p className="text-xs text-muted-foreground">{tx.category}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className={`text-sm font-semibold ${tx.type === "income" ? "text-success" : "text-destructive"}`}>
+                      {tx.type === "income" ? "+" : "-"}{tx.amount.toLocaleString()} {tx.currency}
+                    </p>
+                    <p className="text-xs text-muted-foreground">{new Date(tx.created_at).toLocaleDateString()}</p>
+                  </div>
+                </div>
+              ))}
             </div>
-            <Button variant="ghost" size="sm">View All</Button>
-          </div>
-          <div className="mt-4 space-y-2">
-            {transactions.map((tx) => (
-              <div key={tx.id} className="flex items-center gap-3 rounded-lg px-4 py-3 transition-colors hover:bg-muted/50">
-                <div className={`flex h-9 w-9 items-center justify-center rounded-full ${tx.type === "income" ? "bg-success/10" : "bg-destructive/10"}`}>
-                  {tx.type === "income" ? (
-                    <ArrowUpRight className="h-4 w-4 text-success" />
-                  ) : (
-                    <ArrowDownRight className="h-4 w-4 text-destructive" />
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="truncate text-sm font-medium text-card-foreground">{tx.desc}</p>
-                  <p className="text-xs text-muted-foreground">{tx.method}</p>
-                </div>
-                <div className="text-right">
-                  <p className={`text-sm font-semibold ${tx.type === "income" ? "text-success" : "text-destructive"}`}>
-                    {tx.amount}
-                  </p>
-                  <p className="text-xs text-muted-foreground">{tx.date}</p>
-                </div>
-              </div>
-            ))}
-          </div>
+          )}
         </motion.div>
       </div>
     </DashboardLayout>
