@@ -12,6 +12,7 @@ import {
   BarChart3,
   Settings,
   ShieldCheck,
+  FolderKanban,
   LogOut,
   ChevronLeft,
   Menu,
@@ -33,6 +34,7 @@ const navItems = [
   { icon: ShoppingCart, label: "Marketplace", href: "/marketplace" },
   { icon: GraduationCap, label: "Training", href: "/training" },
   { icon: BarChart3, label: "Reports", href: "/reports" },
+  { icon: FolderKanban, label: "Projects", href: "/projects" },
   { icon: Settings, label: "Settings", href: "/settings" },
   { icon: ShieldCheck, label: "Admin", href: "/admin" },
 ];

@@ -19,6 +19,7 @@ import Training from "./pages/Training";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
 import Admin from "./pages/Admin";
+import Projects from "./pages/Projects";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -48,6 +49,7 @@ const App = () => (
             <Route path="/training" element={<Protected><Training /></Protected>} />
             <Route path="/reports" element={<Protected><Reports /></Protected>} />
             <Route path="/settings" element={<Protected><Settings /></Protected>} />
+            <Route path="/projects" element={<Protected><Projects /></Protected>} />
             <Route path="/admin" element={<Protected><Admin /></Protected>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
