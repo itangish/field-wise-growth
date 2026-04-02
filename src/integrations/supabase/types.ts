@@ -255,6 +255,60 @@ export type Database = {
         }
         Relationships: []
       }
+      projects: {
+        Row: {
+          category: string | null
+          created_at: string
+          crop_type: string | null
+          description: string | null
+          id: string
+          location: string | null
+          name: string
+          photos: string[] | null
+          priority: string | null
+          recommendations: string | null
+          status: string
+          summary: string | null
+          tags: string[] | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          crop_type?: string | null
+          description?: string | null
+          id?: string
+          location?: string | null
+          name: string
+          photos?: string[] | null
+          priority?: string | null
+          recommendations?: string | null
+          status?: string
+          summary?: string | null
+          tags?: string[] | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          crop_type?: string | null
+          description?: string | null
+          id?: string
+          location?: string | null
+          name?: string
+          photos?: string[] | null
+          priority?: string | null
+          recommendations?: string | null
+          status?: string
+          summary?: string | null
+          tags?: string[] | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       resources: {
         Row: {
           capacity: number
