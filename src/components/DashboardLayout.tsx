@@ -12,6 +12,7 @@ import {
   BarChart3,
   Settings,
   ShieldCheck,
+  FolderKanban,
   LogOut,
   ChevronLeft,
   Menu,
