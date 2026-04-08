@@ -38,7 +38,17 @@ const Auth = () => {
     if (mode === "login") {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       setLoading(false);
-      if (error) return toast({ title: "Login failed", description: error.message, variant: "destructive" });
+      if (error) {
+        const isInvalidCreds = error.message.toLowerCase().includes("invalid login credentials");
+        return toast({
+          title: "Login failed",
+          description: isInvalidCreds
+            ? "Wrong email or password. Try again or use 'Forgot password?' to reset."
+            : error.message,
+          variant: "destructive",
+        });
+      }
+      toast({ title: "Welcome back!", description: "Signed in successfully." });
       navigate("/dashboard");
     } else {
       const { data, error } = await supabase.auth.signUp({
@@ -50,13 +60,30 @@ const Auth = () => {
         },
       });
       setLoading(false);
-      if (error) return toast({ title: "Signup failed", description: error.message, variant: "destructive" });
-      
+      if (error) {
+        const isExisting = error.message.toLowerCase().includes("already registered");
+        return toast({
+          title: "Signup failed",
+          description: isExisting
+            ? "This email is already registered. Switch to Sign In instead."
+            : error.message,
+          variant: "destructive",
+        });
+      }
+
       // Auto-confirmed: navigate directly
       if (data.session) {
         toast({ title: "Welcome!", description: "Your account has been created." });
         navigate("/dashboard");
       } else {
+        // If no session but also no error and user identity exists, user already exists (fake signup response)
+        if (data.user && data.user.identities && data.user.identities.length === 0) {
+          return toast({
+            title: "Email already registered",
+            description: "Switch to Sign In to access your account.",
+            variant: "destructive",
+          });
+        }
         toast({ title: "Account created!", description: "You can now sign in." });
         setMode("login");
       }
