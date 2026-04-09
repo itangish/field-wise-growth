@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
+import { supabase } from "@/integrations/supabase/client";
 import { motion, AnimatePresence } from "framer-motion";
-import { Brain, Lightbulb, Bug, Droplets, TrendingUp, ShieldCheck, Sparkles, Loader2, CheckCircle2 } from "lucide-react";
+import { Brain, Lightbulb, Bug, Droplets, TrendingUp, ShieldCheck, Sparkles, Loader2, CheckCircle2, Camera, Upload, X, AlertTriangle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
@@ -16,6 +17,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 
 const initialRecommendations = [
   { id: 1, type: "Pest Alert", icon: "bug", priority: "High", title: "Fall Armyworm detected in Field A3", detail: "Image analysis confirms early-stage infestation in maize crops. Recommend applying Chlorantraniliprole within 48 hours.", confidence: "92%", crop: "Maize" },
@@ -31,9 +33,10 @@ const iconMap: Record<string, React.ReactNode> = {
   sparkles: <Sparkles className="h-5 w-5" />,
   trending: <TrendingUp className="h-5 w-5" />,
   shield: <ShieldCheck className="h-5 w-5" />,
+  camera: <Camera className="h-5 w-5" />,
 };
 
-const priorityColor = { High: "bg-destructive/10 text-destructive", Medium: "bg-warning/10 text-warning", Low: "bg-success/10 text-success" };
+const priorityColor = { High: "bg-destructive/10 text-destructive", Medium: "bg-warning/10 text-warning", Low: "bg-success/10 text-success", Critical: "bg-destructive/20 text-destructive" };
 
 const Advisory = () => {
   const [recommendations, setRecommendations] = useState(initialRecommendations);
@@ -41,6 +44,15 @@ const Advisory = () => {
   const [analysisOpen, setAnalysisOpen] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisForm, setAnalysisForm] = useState({ crop: "", location: "", issue: "" });
+
+  // Plant diagnosis states
+  const [diagnosisOpen, setDiagnosisOpen] = useState(false);
+  const [diagnosing, setDiagnosing] = useState(false);
+  const [plantImage, setPlantImage] = useState<string | null>(null);
+  const [plantImagePreview, setPlantImagePreview] = useState<string | null>(null);
+  const [diagnosisResult, setDiagnosisResult] = useState<any>(null);
+  const [plantDescription, setPlantDescription] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleDismiss = (id: number) => {
     setRecommendations((prev) => prev.filter((r) => r.id !== id));
@@ -58,7 +70,6 @@ const Advisory = () => {
       return;
     }
     setAnalyzing(true);
-    // Simulate AI analysis
     await new Promise((r) => setTimeout(r, 2500));
 
     const newId = Date.now();
@@ -80,6 +91,73 @@ const Advisory = () => {
     toast({ title: "Analysis Complete", description: "New AI recommendation added to your list." });
   };
 
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ title: "File too large", description: "Please select an image under 5MB.", variant: "destructive" });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      setPlantImagePreview(result);
+      // Extract base64 without the data URI prefix
+      setPlantImage(result.split(",")[1]);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleDiagnose = async () => {
+    if (!plantImage && !plantDescription) {
+      toast({ title: "Provide input", description: "Please upload a photo or describe the plant issue.", variant: "destructive" });
+      return;
+    }
+
+    setDiagnosing(true);
+    setDiagnosisResult(null);
+
+    try {
+      const { data, error } = await supabase.functions.invoke("diagnose-plant", {
+        body: { imageBase64: plantImage, description: plantDescription },
+      });
+
+      if (error) throw error;
+
+      setDiagnosisResult(data);
+
+      // Add as recommendation if disease found
+      if (data.disease && data.disease !== "Healthy") {
+        const newRec = {
+          id: Date.now(),
+          type: "Disease Diagnosis",
+          icon: "camera",
+          priority: data.severity === "Critical" || data.severity === "High" ? "High" : "Medium",
+          title: `${data.disease} detected on ${data.plant || "plant"}`,
+          detail: data.description || "AI analysis completed. Check diagnosis details for treatment.",
+          confidence: data.confidence || "85%",
+          crop: data.plant || "Unknown",
+        };
+        setRecommendations((prev) => [newRec, ...prev]);
+      }
+
+      toast({ title: "🔬 Diagnosis Complete", description: data.disease === "Healthy" ? "Your plant looks healthy!" : `Detected: ${data.disease}` });
+    } catch (err: any) {
+      console.error("Diagnosis error:", err);
+      toast({ title: "Diagnosis failed", description: err.message || "Could not analyze the image.", variant: "destructive" });
+    } finally {
+      setDiagnosing(false);
+    }
+  };
+
+  const resetDiagnosis = () => {
+    setPlantImage(null);
+    setPlantImagePreview(null);
+    setPlantDescription("");
+    setDiagnosisResult(null);
+  };
+
   const activeCount = recommendations.length;
   const highPriority = recommendations.filter((r) => r.priority === "High").length;
 
@@ -91,10 +169,16 @@ const Advisory = () => {
             <h1 className="font-display text-2xl font-bold text-foreground">AI Smart Advisory</h1>
             <p className="text-muted-foreground">AI-powered recommendations for pest control, irrigation, and yield optimization</p>
           </div>
-          <Button size="sm" onClick={() => setAnalysisOpen(true)}>
-            <Brain className="mr-1.5 h-4 w-4" />
-            Request Analysis
-          </Button>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" onClick={() => { resetDiagnosis(); setDiagnosisOpen(true); }}>
+              <Camera className="mr-1.5 h-4 w-4" />
+              Diagnose Plant
+            </Button>
+            <Button size="sm" onClick={() => setAnalysisOpen(true)}>
+              <Brain className="mr-1.5 h-4 w-4" />
+              Request Analysis
+            </Button>
+          </div>
         </div>
 
         {/* AI Summary */}
@@ -197,6 +281,129 @@ const Advisory = () => {
             <Button onClick={handleRequestAnalysis} disabled={analyzing}>
               {analyzing ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> Analyzing...</> : <><Brain className="mr-1.5 h-4 w-4" /> Analyze</>}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Plant Disease Diagnosis Dialog */}
+      <Dialog open={diagnosisOpen} onOpenChange={setDiagnosisOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Camera className="h-5 w-5 text-primary" /> Plant Disease Diagnosis
+            </DialogTitle>
+            <DialogDescription>Upload a photo of your plant and AI will identify diseases, pests, or health issues.</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Image Upload */}
+            <div>
+              <Label>Plant Photo</Label>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={handleImageSelect}
+              />
+              {plantImagePreview ? (
+                <div className="relative mt-2 rounded-lg overflow-hidden border border-border">
+                  <img src={plantImagePreview} alt="Plant" className="w-full h-48 object-cover" />
+                  <Button
+                    size="icon"
+                    variant="destructive"
+                    className="absolute top-2 right-2 h-7 w-7"
+                    onClick={() => { setPlantImage(null); setPlantImagePreview(null); }}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="mt-2 flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border p-8 cursor-pointer hover:border-primary/50 transition-colors"
+                >
+                  <Upload className="h-8 w-8 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">Click to upload or take a photo</p>
+                  <p className="text-xs text-muted-foreground">JPG, PNG up to 5MB</p>
+                </div>
+              )}
+            </div>
+
+            {/* Optional Description */}
+            <div>
+              <Label>Additional Description (optional)</Label>
+              <Textarea
+                placeholder="Describe any symptoms: yellowing leaves, spots, wilting..."
+                value={plantDescription}
+                onChange={(e) => setPlantDescription(e.target.value)}
+              />
+            </div>
+
+            {/* Diagnosis Result */}
+            {diagnosisResult && (
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-lg border border-border bg-muted/50 p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  {diagnosisResult.disease === "Healthy" ? (
+                    <CheckCircle2 className="h-5 w-5 text-success" />
+                  ) : (
+                    <AlertTriangle className="h-5 w-5 text-destructive" />
+                  )}
+                  <h4 className="font-bold text-sm text-card-foreground">
+                    {diagnosisResult.disease === "Healthy" ? "Plant is Healthy!" : diagnosisResult.disease || "Disease Detected"}
+                  </h4>
+                  {diagnosisResult.severity && (
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${priorityColor[diagnosisResult.severity as keyof typeof priorityColor] || "bg-muted text-muted-foreground"}`}>
+                      {diagnosisResult.severity}
+                    </span>
+                  )}
+                </div>
+
+                {diagnosisResult.plant && (
+                  <p className="text-xs text-muted-foreground">🌱 Plant: <strong>{diagnosisResult.plant}</strong> · Confidence: {diagnosisResult.confidence}</p>
+                )}
+
+                {diagnosisResult.description && (
+                  <p className="text-sm text-muted-foreground">{diagnosisResult.description}</p>
+                )}
+
+                {diagnosisResult.treatment && diagnosisResult.treatment.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-card-foreground mb-1">💊 Treatment:</p>
+                    <ul className="text-xs text-muted-foreground space-y-1">
+                      {diagnosisResult.treatment.map((t: string, i: number) => (
+                        <li key={i} className="flex gap-1.5"><span className="text-primary">•</span>{t}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {diagnosisResult.prevention && diagnosisResult.prevention.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-card-foreground mb-1">🛡️ Prevention:</p>
+                    <ul className="text-xs text-muted-foreground space-y-1">
+                      {diagnosisResult.prevention.map((t: string, i: number) => (
+                        <li key={i} className="flex gap-1.5"><span className="text-success">•</span>{t}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </motion.div>
+            )}
+          </div>
+
+          <DialogFooter>
+            {diagnosisResult ? (
+              <Button onClick={() => { resetDiagnosis(); }}>New Diagnosis</Button>
+            ) : (
+              <>
+                <Button variant="outline" onClick={() => setDiagnosisOpen(false)}>Cancel</Button>
+                <Button onClick={handleDiagnose} disabled={diagnosing}>
+                  {diagnosing ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> Diagnosing...</> : <><Camera className="mr-1.5 h-4 w-4" /> Diagnose</>}
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
