@@ -133,16 +133,12 @@ const readingMaterials = [
 const Training = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const certCanvasRef = useRef<HTMLCanvasElement>(null);
-
   // Dialog states
   const [certDialogOpen, setCertDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterCategory, setFilterCategory] = useState<string>("all");
   const [filterLevel, setFilterLevel] = useState<string>("all");
   const [readingListOpen, setReadingListOpen] = useState(false);
-  const [readingOpen, setReadingOpen] = useState(false);
-  const [selectedBook, setSelectedBook] = useState<typeof readingMaterials[0] | null>(null);
 
   // Book content study states
   const [studyOpen, setStudyOpen] = useState(false);
