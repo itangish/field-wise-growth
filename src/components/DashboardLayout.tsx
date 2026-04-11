@@ -16,6 +16,7 @@ import {
   LogOut,
   ChevronLeft,
   Menu,
+  CreditCard,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import Logo from "./Logo";
@@ -34,6 +35,7 @@ const navItems = [
   { icon: ShoppingCart, label: "Marketplace", href: "/marketplace" },
   { icon: GraduationCap, label: "Training", href: "/training" },
   { icon: BarChart3, label: "Reports", href: "/reports" },
+  { icon: CreditCard, label: "Payments", href: "/payments" },
   { icon: FolderKanban, label: "Projects", href: "/projects" },
   { icon: Settings, label: "Settings", href: "/settings" },
   { icon: ShieldCheck, label: "Admin", href: "/admin" },
