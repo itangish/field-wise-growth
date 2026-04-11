@@ -14,6 +14,7 @@ import Weather from "./pages/Weather";
 import Advisory from "./pages/Advisory";
 import Resources from "./pages/Resources";
 import Finance from "./pages/Finance";
+import Payments from "./pages/Payments";
 import Marketplace from "./pages/Marketplace";
 import Training from "./pages/Training";
 import Reports from "./pages/Reports";
