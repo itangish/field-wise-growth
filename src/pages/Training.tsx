@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import DashboardLayout from "@/components/DashboardLayout";
 import { supabase } from "@/integrations/supabase/client";
@@ -6,7 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { motion } from "framer-motion";
 import {
   GraduationCap, Play, BookOpen, Award, Clock, CheckCircle2, Lock, Download, Search, Filter,
-  FileText, HelpCircle, X, Share2, Mail, Github, MessageCircle, Facebook, Instagram, ChevronLeft, ChevronRight,
+  FileText, HelpCircle, X, Share2, Mail, Github, MessageCircle, Facebook, Instagram, ChevronLeft, ChevronRight, Globe, User, Users,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -26,55 +26,34 @@ const statusIcon = {
   "Not Started": <Lock className="h-4 w-4 text-muted-foreground" />,
 };
 
-// Generate 9 content units per book with assessment questions
+// Trainers data
+const trainers = [
+  { name: "Dr. Jean Claude Habimana", specialty: "Soil Science & Crop Management", experience: "15 years", institution: "Rwanda Agriculture Board", avatar: "JH" },
+  { name: "Prof. Marie Claire Uwimana", specialty: "Pest Control & Plant Pathology", experience: "12 years", institution: "University of Rwanda", avatar: "MU" },
+  { name: "Eng. Patrick Ndayisaba", specialty: "Irrigation & Water Management", experience: "10 years", institution: "RAB - Irrigation Division", avatar: "PN" },
+  { name: "Dr. Solange Mukamana", specialty: "Post-Harvest & Food Technology", experience: "8 years", institution: "NAEB", avatar: "SM" },
+  { name: "Mr. Emmanuel Nshimiyimana", specialty: "Farm Business & Finance", experience: "11 years", institution: "BDF Rwanda", avatar: "EN" },
+  { name: "Dr. Aimable Gahakwa", specialty: "Climate-Resilient Agriculture", experience: "14 years", institution: "IITA Rwanda", avatar: "AG" },
+];
+
 const generateBookContents = (title: string, category: string) => {
   const topics: Record<string, string[]> = {
-    "Soil Science": [
-      "Introduction to Soil Types", "Soil pH and Testing", "Soil Nutrients & NPK", "Organic Matter & Composting",
-      "Soil Erosion Prevention", "Soil Moisture Management", "Soil Microorganisms", "Soil Amendment Techniques", "Soil Health Assessment"
-    ],
-    "Pest Control": [
-      "Introduction to Pest Management", "Identifying Common Pests", "Biological Control Methods", "Organic Pesticides",
-      "Integrated Pest Management (IPM)", "Disease Prevention in Crops", "Beneficial Insects", "Chemical Safety", "Monitoring & Record Keeping"
-    ],
-    "Irrigation": [
-      "Water Sources & Quality", "Drip Irrigation Systems", "Sprinkler Systems", "Rainwater Harvesting",
-      "Scheduling Irrigation", "Water Conservation Techniques", "Soil Moisture Sensors", "Gravity-Fed Irrigation", "System Maintenance"
-    ],
-    "Post-Harvest": [
-      "Harvesting Best Practices", "Drying Techniques", "Storage Structures", "Pest Control in Storage",
-      "Quality Grading", "Packaging for Market", "Cold Chain Management", "Processing Basics", "Loss Reduction Strategies"
-    ],
-    "Crop Science": [
-      "Crop Varieties Overview", "Seed Selection & Quality", "Climate Adaptation", "Drought-Resistant Crops",
-      "Planting Techniques", "Growth Stages & Care", "Fertilization Schedules", "Hybrid vs Heritage Crops", "Yield Optimization"
-    ],
-    "Business": [
-      "Farm Business Planning", "Record Keeping & Budgeting", "Market Research", "Pricing Strategies",
-      "Cooperative Farming", "Access to Finance", "Value Chain Analysis", "Risk Management", "Digital Tools for Farmers"
-    ],
+    "Soil Science": ["Introduction to Soil Types", "Soil pH and Testing", "Soil Nutrients & NPK", "Organic Matter & Composting", "Soil Erosion Prevention", "Soil Moisture Management", "Soil Microorganisms", "Soil Amendment Techniques", "Soil Health Assessment"],
+    "Pest Control": ["Introduction to Pest Management", "Identifying Common Pests", "Biological Control Methods", "Organic Pesticides", "Integrated Pest Management (IPM)", "Disease Prevention in Crops", "Beneficial Insects", "Chemical Safety", "Monitoring & Record Keeping"],
+    "Irrigation": ["Water Sources & Quality", "Drip Irrigation Systems", "Sprinkler Systems", "Rainwater Harvesting", "Scheduling Irrigation", "Water Conservation Techniques", "Soil Moisture Sensors", "Gravity-Fed Irrigation", "System Maintenance"],
+    "Post-Harvest": ["Harvesting Best Practices", "Drying Techniques", "Storage Structures", "Pest Control in Storage", "Quality Grading", "Packaging for Market", "Cold Chain Management", "Processing Basics", "Loss Reduction Strategies"],
+    "Crop Science": ["Crop Varieties Overview", "Seed Selection & Quality", "Climate Adaptation", "Drought-Resistant Crops", "Planting Techniques", "Growth Stages & Care", "Fertilization Schedules", "Hybrid vs Heritage Crops", "Yield Optimization"],
+    "Business": ["Farm Business Planning", "Record Keeping & Budgeting", "Market Research", "Pricing Strategies", "Cooperative Farming", "Access to Finance", "Value Chain Analysis", "Risk Management", "Digital Tools for Farmers"],
   };
-
   const contents = (topics[category] || topics["Crop Science"]).map((topic, i) => ({
-    unit: i + 1,
-    title: topic,
-    content: `This unit covers ${topic.toLowerCase()} in detail. You will learn the fundamental concepts, practical techniques, and real-world applications relevant to ${category.toLowerCase()}. Study the material carefully to prepare for the end-of-unit assessment.
-
-Key Learning Points:
-• Understanding the core principles of ${topic.toLowerCase()}
-• Practical applications for Rwandan farms
-• Common challenges and how to overcome them
-• Case studies and success stories
-
-By the end of this unit, you should be able to apply these concepts in your farming practice and demonstrate your understanding through the assessment.`,
+    unit: i + 1, title: topic,
+    content: `This unit covers ${topic.toLowerCase()} in detail. You will learn the fundamental concepts, practical techniques, and real-world applications relevant to ${category.toLowerCase()}. Study the material carefully to prepare for the end-of-unit assessment.\n\nKey Learning Points:\n• Understanding the core principles of ${topic.toLowerCase()}\n• Practical applications for Rwandan farms\n• Common challenges and how to overcome them\n• Case studies and success stories\n\nBy the end of this unit, you should be able to apply these concepts in your farming practice and demonstrate your understanding through the assessment.`,
     assessment: generateUnitAssessment(topic, category, i),
   }));
-
   return contents;
 };
 
 const generateUnitAssessment = (topic: string, category: string, unitIndex: number) => {
-  // Each unit gets 3 questions
   const allQuestions: Record<string, Array<Array<{ question: string; options: string[]; correct: number }>>> = {
     "Soil Science": [
       [{ question: "What are the three main soil types?", options: ["Sand, silt, clay", "Rock, mud, dust", "Gravel, peat, chalk", "Iron, calcium, zinc"], correct: 0 },
@@ -106,41 +85,38 @@ const generateUnitAssessment = (topic: string, category: string, unitIndex: numb
        { question: "What is a soil health card?", options: ["Credit card", "Document recording soil test results", "Greeting card", "ID card"], correct: 1 }],
     ],
   };
-
   const defaultQuestions = [
     { question: `What is the main focus of "${topic}"?`, options: ["Unrelated topic", `Understanding ${topic.toLowerCase()}`, "Random information", "Entertainment"], correct: 1 },
     { question: `Why is ${topic.toLowerCase()} important in farming?`, options: ["It's not important", "Improves productivity and sustainability", "For fun only", "Government requirement"], correct: 1 },
     { question: `Which best practice applies to ${topic.toLowerCase()}?`, options: ["Ignore all guidelines", "Follow research-based recommendations", "Use random methods", "Copy without understanding"], correct: 1 },
   ];
-
   const categoryQuestions = allQuestions[category];
-  if (categoryQuestions && categoryQuestions[unitIndex]) {
-    return categoryQuestions[unitIndex];
-  }
+  if (categoryQuestions && categoryQuestions[unitIndex]) return categoryQuestions[unitIndex];
   return defaultQuestions;
 };
 
-// Online reading materials with 9 content units each
 const readingMaterials = [
-  { id: "1", title: "Complete Guide to Soil Health", category: "Soil Science", pages: 45, description: "Learn about soil composition, testing, and improvement techniques for better crop yields." },
-  { id: "2", title: "Organic Pest Management Handbook", category: "Pest Control", pages: 38, description: "Natural and organic methods to protect your crops from common pests without harmful chemicals." },
-  { id: "3", title: "Water-Smart Farming Techniques", category: "Irrigation", pages: 32, description: "Efficient irrigation methods including drip systems, rainwater harvesting, and moisture management." },
-  { id: "4", title: "Post-Harvest Storage Best Practices", category: "Post-Harvest", pages: 28, description: "Reduce crop losses with proper storage, drying, and preservation techniques." },
-  { id: "5", title: "Climate-Resilient Crop Varieties", category: "Crop Science", pages: 52, description: "Guide to selecting and growing crop varieties that withstand extreme weather conditions." },
-  { id: "6", title: "Farm Business Planning Manual", category: "Business", pages: 40, description: "Financial planning, record-keeping, and market analysis for profitable farming." },
+  { id: "1", title: "Complete Guide to Soil Health", category: "Soil Science", pages: 45, description: "Learn about soil composition, testing, and improvement techniques for better crop yields.", trainer: trainers[0] },
+  { id: "2", title: "Organic Pest Management Handbook", category: "Pest Control", pages: 38, description: "Natural and organic methods to protect your crops from common pests without harmful chemicals.", trainer: trainers[1] },
+  { id: "3", title: "Water-Smart Farming Techniques", category: "Irrigation", pages: 32, description: "Efficient irrigation methods including drip systems, rainwater harvesting, and moisture management.", trainer: trainers[2] },
+  { id: "4", title: "Post-Harvest Storage Best Practices", category: "Post-Harvest", pages: 28, description: "Reduce crop losses with proper storage, drying, and preservation techniques.", trainer: trainers[3] },
+  { id: "5", title: "Climate-Resilient Crop Varieties", category: "Crop Science", pages: 52, description: "Guide to selecting and growing crop varieties that withstand extreme weather conditions.", trainer: trainers[5] },
+  { id: "6", title: "Farm Business Planning Manual", category: "Business", pages: 40, description: "Financial planning, record-keeping, and market analysis for profitable farming.", trainer: trainers[4] },
 ];
 
 const Training = () => {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const queryClient = useQueryClient();
-  // Dialog states
   const [certDialogOpen, setCertDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterCategory, setFilterCategory] = useState<string>("all");
   const [filterLevel, setFilterLevel] = useState<string>("all");
   const [readingListOpen, setReadingListOpen] = useState(false);
+  const [trainerProfileOpen, setTrainerProfileOpen] = useState(false);
+  const [selectedTrainer, setSelectedTrainer] = useState<typeof trainers[0] | null>(null);
+  const [userProfileOpen, setUserProfileOpen] = useState(false);
 
-  // Book content study states
+  // Book study states
   const [studyOpen, setStudyOpen] = useState(false);
   const [studyBook, setStudyBook] = useState<typeof readingMaterials[0] | null>(null);
   const [currentUnit, setCurrentUnit] = useState(0);
@@ -152,7 +128,11 @@ const Training = () => {
   const [unitScore, setUnitScore] = useState(0);
   const [completedUnits, setCompletedUnits] = useState<Record<string, number[]>>({});
 
-  // Quiz states (for DB courses)
+  // Study timer - track time spent studying (in seconds)
+  const [studyStartTime, setStudyStartTime] = useState<number | null>(null);
+  const [studyElapsed, setStudyElapsed] = useState(0);
+
+  // Quiz states
   const [quizOpen, setQuizOpen] = useState(false);
   const [quizCourseId, setQuizCourseId] = useState<string | null>(null);
   const [quizCourseTitle, setQuizCourseTitle] = useState("");
@@ -168,9 +148,25 @@ const Training = () => {
   const [certCourse, setCertCourse] = useState<string>("");
   const [shareOpen, setShareOpen] = useState(false);
   const [shareTitle, setShareTitle] = useState("");
-
-  // Earned book certificates
   const [bookCertificates, setBookCertificates] = useState<Array<{ bookTitle: string; category: string; date: string; score: number }>>([]);
+
+  // Study timer effect
+  useEffect(() => {
+    if (!studyOpen || !studyStartTime) return;
+    const interval = setInterval(() => {
+      setStudyElapsed(Math.floor((Date.now() - studyStartTime) / 1000));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [studyOpen, studyStartTime]);
+
+  const formatTime = (secs: number) => {
+    const h = Math.floor(secs / 3600);
+    const m = Math.floor((secs % 3600) / 60);
+    const s = secs % 60;
+    return `${h}h ${m.toString().padStart(2, "0")}m ${s.toString().padStart(2, "0")}s`;
+  };
+
+  const hasStudiedEnough = studyElapsed >= 3600; // 1 hour
 
   const { data: courses = [], isLoading } = useQuery({
     queryKey: ["courses"],
@@ -194,9 +190,7 @@ const Training = () => {
 
   const startCourse = useMutation({
     mutationFn: async (courseId: string) => {
-      const { error } = await supabase.from("course_progress").insert({
-        user_id: user!.id, course_id: courseId, status: "In Progress", completed_lessons: 0,
-      });
+      const { error } = await supabase.from("course_progress").insert({ user_id: user!.id, course_id: courseId, status: "In Progress", completed_lessons: 0 });
       if (error) throw error;
     },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["course-progress"] }); toast({ title: "Course started!" }); },
@@ -206,9 +200,7 @@ const Training = () => {
   const completeCourse = useMutation({
     mutationFn: async (courseId: string) => {
       const course = courses.find((c) => c.id === courseId);
-      const { error } = await supabase.from("course_progress").update({
-        status: "Completed", completed_lessons: course?.lessons || 0, completed_at: new Date().toISOString(),
-      }).eq("user_id", user!.id).eq("course_id", courseId);
+      const { error } = await supabase.from("course_progress").update({ status: "Completed", completed_lessons: course?.lessons || 0, completed_at: new Date().toISOString() }).eq("user_id", user!.id).eq("course_id", courseId);
       if (error) throw error;
     },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["course-progress"] }); toast({ title: "🎓 Course Completed!", description: "You've earned a certificate!" }); },
@@ -231,7 +223,6 @@ const Training = () => {
     return matchSearch && matchCategory && matchLevel;
   });
 
-  // Quiz for DB courses
   const quizQuestions: Record<string, Array<{ question: string; options: string[]; correct: number }>> = {
     "Crop Management": [
       { question: "What is the optimal soil pH for most crops?", options: ["4.0 - 5.0", "5.5 - 7.0", "8.0 - 9.0", "3.0 - 4.0"], correct: 1 },
@@ -272,13 +263,13 @@ const Training = () => {
       const correct = newAnswers.reduce((count, ans, i) => count + (ans === questions[i].correct ? 1 : 0), 0);
       const pct = Math.round((correct / questions.length) * 100);
       setScore(pct); setQuizCompleted(true);
-      if (pct >= 70 && quizCourseId) completeCourse.mutate(quizCourseId);
+      if (pct >= 50 && quizCourseId) completeCourse.mutate(quizCourseId);
     } else { setCurrentQuestion(currentQuestion + 1); setSelectedAnswer(null); }
   };
 
-  // Book study functions
   const openBookStudy = (book: typeof readingMaterials[0]) => {
     setStudyBook(book); setCurrentUnit(0); setReadingListOpen(false); setStudyOpen(true);
+    setStudyStartTime(Date.now()); setStudyElapsed(0);
   };
 
   const getBookContents = () => {
@@ -289,6 +280,10 @@ const Training = () => {
   const getCompletedUnitsForBook = (bookId: string) => completedUnits[bookId] || [];
 
   const startUnitAssessment = () => {
+    if (!hasStudiedEnough) {
+      toast({ title: "⏰ Study More", description: `You need to study for at least 1 hour before taking the assessment. Time studied: ${formatTime(studyElapsed)}`, variant: "destructive" });
+      return;
+    }
     setUnitQuestionIndex(0); setUnitSelectedAnswer(null); setUnitAnswers([]); setUnitAssessmentDone(false); setUnitScore(0);
     setUnitAssessmentOpen(true);
   };
@@ -303,21 +298,17 @@ const Training = () => {
       const correct = newAnswers.reduce((count, ans, i) => count + (ans === questions[i].correct ? 1 : 0), 0);
       const pct = Math.round((correct / questions.length) * 100);
       setUnitScore(pct); setUnitAssessmentDone(true);
-      if (pct >= 70 && studyBook) {
+      if (pct >= 50 && studyBook) {
         const bookId = studyBook.id;
         const prev = completedUnits[bookId] || [];
         if (!prev.includes(currentUnit)) {
           setCompletedUnits({ ...completedUnits, [bookId]: [...prev, currentUnit] });
         }
-        // Check if all 9 units completed → award book certificate
         const updatedCompleted = [...prev, currentUnit];
         if (updatedCompleted.length >= 9) {
           const already = bookCertificates.find(bc => bc.bookTitle === studyBook.title);
           if (!already) {
-            setBookCertificates([...bookCertificates, {
-              bookTitle: studyBook.title, category: studyBook.category,
-              date: new Date().toLocaleDateString(), score: pct,
-            }]);
+            setBookCertificates([...bookCertificates, { bookTitle: studyBook.title, category: studyBook.category, date: new Date().toLocaleDateString(), score: pct }]);
             toast({ title: "🎓 Book Certificate Earned!", description: `You completed all 9 units of "${studyBook.title}"!` });
           }
         }
@@ -325,60 +316,49 @@ const Training = () => {
     } else { setUnitQuestionIndex(unitQuestionIndex + 1); setUnitSelectedAnswer(null); }
   };
 
-  // Certificate generation
   const generateCertificateImage = (title: string): string => {
     const canvas = document.createElement("canvas");
     canvas.width = 800; canvas.height = 560;
     const ctx = canvas.getContext("2d")!;
-
-    // Background
     ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, 800, 560);
-    // Border
     ctx.strokeStyle = "#1a7a4c"; ctx.lineWidth = 4; ctx.strokeRect(20, 20, 760, 520);
     ctx.strokeStyle = "#c9a84c"; ctx.lineWidth = 2; ctx.strokeRect(28, 28, 744, 504);
-
-    // Header
-    ctx.fillStyle = "#1a7a4c"; ctx.font = "bold 28px Georgia, serif"; ctx.textAlign = "center";
-    ctx.fillText("CERTIFICATE OF COMPLETION", 400, 80);
-
-    // Decorative line
-    ctx.strokeStyle = "#c9a84c"; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(200, 95); ctx.lineTo(600, 95); ctx.stroke();
-
-    // Award icon text
-    ctx.fillStyle = "#c9a84c"; ctx.font = "48px serif"; ctx.fillText("🏆", 400, 155);
-
-    // "This certifies that"
-    ctx.fillStyle = "#333"; ctx.font = "16px Georgia, serif";
-    ctx.fillText("This is to certify that", 400, 195);
-
-    // User name
+    // Header - Moses AMS Company
+    ctx.fillStyle = "#1a7a4c"; ctx.font = "bold 18px Georgia, serif"; ctx.textAlign = "center";
+    ctx.fillText("MOSES AMS COMPANY", 400, 60);
+    ctx.fillStyle = "#666"; ctx.font = "12px Georgia, serif";
+    ctx.fillText("Agricultural Management System", 400, 80);
+    ctx.strokeStyle = "#c9a84c"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(200, 90); ctx.lineTo(600, 90); ctx.stroke();
     ctx.fillStyle = "#1a7a4c"; ctx.font = "bold 26px Georgia, serif";
-    ctx.fillText(user?.user_metadata?.full_name || user?.email || "Student", 400, 235);
-
-    // Line under name
-    ctx.strokeStyle = "#ccc"; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(200, 248); ctx.lineTo(600, 248); ctx.stroke();
-
-    // Completion text
+    ctx.fillText("CERTIFICATE OF COMPLETION", 400, 125);
+    ctx.strokeStyle = "#c9a84c"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(200, 140); ctx.lineTo(600, 140); ctx.stroke();
+    ctx.fillStyle = "#c9a84c"; ctx.font = "48px serif"; ctx.fillText("🏆", 400, 195);
     ctx.fillStyle = "#333"; ctx.font = "16px Georgia, serif";
-    ctx.fillText("has successfully completed the course", 400, 285);
-
-    // Course title
+    ctx.fillText("This is to certify that", 400, 230);
+    ctx.fillStyle = "#1a7a4c"; ctx.font = "bold 26px Georgia, serif";
+    ctx.fillText(profile?.full_name || user?.user_metadata?.full_name || user?.email || "Student", 400, 270);
+    ctx.strokeStyle = "#ccc"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(200, 283); ctx.lineTo(600, 283); ctx.stroke();
+    ctx.fillStyle = "#333"; ctx.font = "16px Georgia, serif";
+    ctx.fillText("has successfully completed the course", 400, 315);
     ctx.fillStyle = "#1a3c2a"; ctx.font = "bold 22px Georgia, serif";
     const lines = wrapText(ctx, title, 600);
-    lines.forEach((line, i) => ctx.fillText(line, 400, 320 + i * 28));
-
-    // Date & program
-    const y = 320 + lines.length * 28 + 30;
+    lines.forEach((line, i) => ctx.fillText(line, 400, 350 + i * 28));
+    const y = 350 + lines.length * 28 + 25;
     ctx.fillStyle = "#666"; ctx.font = "14px Georgia, serif";
     ctx.fillText(`Date: ${new Date().toLocaleDateString()}`, 400, y);
-    ctx.fillText("Moses Farmer Training Program — 15 Day Course", 400, y + 22);
-
-    // Footer
-    ctx.fillStyle = "#1a7a4c"; ctx.font = "italic 12px Georgia, serif";
-    ctx.fillText("Powered by Moses Farmer Agricultural Platform", 400, 520);
-
+    ctx.fillText("Moses AMS Company — 15 Day Agricultural Training", 400, y + 22);
+    // Signature area
+    ctx.strokeStyle = "#333"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(150, y + 60); ctx.lineTo(350, y + 60); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(450, y + 60); ctx.lineTo(650, y + 60); ctx.stroke();
+    ctx.fillStyle = "#666"; ctx.font = "11px Georgia, serif";
+    ctx.fillText("Director, Moses AMS Company", 250, y + 75);
+    ctx.fillText("Training Coordinator", 550, y + 75);
+    ctx.fillStyle = "#1a7a4c"; ctx.font = "italic 11px Georgia, serif";
+    ctx.fillText("Powered by Moses AMS Company — Agricultural Management System", 400, 530);
     return canvas.toDataURL("image/png");
   };
 
@@ -397,26 +377,24 @@ const Training = () => {
   const downloadCertificate = (title: string) => {
     const dataUrl = generateCertificateImage(title);
     const link = document.createElement("a");
-    link.download = `Certificate-${title.replace(/\s+/g, "-")}.png`;
+    link.download = `Certificate-MosesAMS-${title.replace(/\s+/g, "-")}.png`;
     link.href = dataUrl;
     link.click();
-    toast({ title: "📜 Certificate Downloaded", description: `${title} certificate saved.` });
+    toast({ title: "📜 Certificate Downloaded", description: `${title} certificate from Moses AMS Company saved.` });
   };
 
   const handleShare = (platform: string, title: string) => {
-    const text = `🎓 I just earned a certificate in "${title}" from Moses Farmer Training Program!`;
+    const text = `🎓 I just earned a certificate in "${title}" from Moses AMS Company Training Program!`;
     const url = window.location.origin;
     const encodedText = encodeURIComponent(text);
     const encodedUrl = encodeURIComponent(url);
-
     const links: Record<string, string> = {
       whatsapp: `https://wa.me/?text=${encodedText}%20${encodedUrl}`,
       facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}&quote=${encodedText}`,
       instagram: `https://www.instagram.com/`,
-      email: `mailto:?subject=${encodeURIComponent(`Certificate: ${title}`)}&body=${encodedText}%0A%0A${encodedUrl}`,
+      email: `mailto:?subject=${encodeURIComponent(`Certificate: ${title} — Moses AMS Company`)}&body=${encodedText}%0A%0A${encodedUrl}`,
       github: `https://github.com/`,
     };
-
     if (platform === "instagram") {
       toast({ title: "📸 Instagram", description: "Download your certificate and share it on Instagram!" });
       downloadCertificate(title);
@@ -428,11 +406,16 @@ const Training = () => {
 
   const openShare = (title: string) => { setShareTitle(title); setShareOpen(true); };
 
-  // All certificates (DB courses + book certificates)
   const allCertificates = [
     ...completedCourses.map(c => ({ title: c.title, category: c.category, date: getProgress(c.id)?.completed_at ? new Date(getProgress(c.id)!.completed_at!).toLocaleDateString() : "N/A", type: "course" as const })),
     ...bookCertificates.map(bc => ({ title: bc.bookTitle, category: bc.category, date: bc.date, type: "book" as const })),
   ];
+
+  const handleBrowseInternet = () => {
+    const query = searchQuery.trim() || "agriculture farming courses online Rwanda";
+    window.open(`https://www.google.com/search?q=${encodeURIComponent(query)}`, "_blank");
+    toast({ title: "🌐 Browsing Internet", description: `Searching for "${query}" online` });
+  };
 
   return (
     <DashboardLayout>
@@ -440,7 +423,7 @@ const Training = () => {
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="font-display text-2xl font-bold text-foreground">Training & Knowledge</h1>
-            <p className="text-muted-foreground">15-day courses with 9 content units, assessments & certificates</p>
+            <p className="text-muted-foreground">15-day courses · Study 1hr+ · Pass 50% · Get certified by Moses AMS Company</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" size="sm" onClick={() => setReadingListOpen(true)}>
@@ -451,6 +434,9 @@ const Training = () => {
             </Button>
             <Button variant="outline" size="sm" onClick={() => setGenerateCertOpen(true)}>
               <Download className="mr-1.5 h-4 w-4" />Generate Certificate
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setUserProfileOpen(true)}>
+              <User className="mr-1.5 h-4 w-4" />My Profile
             </Button>
             <Button size="sm" onClick={() => { setSearchQuery(""); setFilterCategory("all"); setFilterLevel("all"); }}>
               <BookOpen className="mr-1.5 h-4 w-4" />Browse All
@@ -467,9 +453,7 @@ const Training = () => {
               </div>
               <div>
                 <p className="font-display text-lg font-bold text-card-foreground">Your Learning Journey</p>
-                <p className="text-sm text-muted-foreground">
-                  {completedCount} completed · {inProgressCount} in progress · {allCertificates.length} certificates
-                </p>
+                <p className="text-sm text-muted-foreground">{completedCount} completed · {inProgressCount} in progress · {allCertificates.length} certificates</p>
               </div>
             </div>
             <div className="w-full sm:w-48">
@@ -479,17 +463,14 @@ const Training = () => {
           </div>
         </motion.div>
 
-        {/* Search & Filter */}
+        {/* Search & Filter - single search with browse internet button */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input placeholder="Search courses..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9" />
           </div>
-          <Button variant="outline" size="sm" onClick={() => {
-            if (!searchQuery.trim()) { toast({ title: "Enter a search term", variant: "destructive" }); return; }
-            toast({ title: `🔍 Searching for "${searchQuery}"`, description: `Found ${filteredCourses.length} result(s)` });
-          }}>
-            <Search className="mr-1.5 h-4 w-4" />Search
+          <Button variant="outline" size="sm" onClick={handleBrowseInternet}>
+            <Globe className="mr-1.5 h-4 w-4" />Browse Internet
           </Button>
           {categories.length > 0 && (
             <Select value={filterCategory} onValueChange={setFilterCategory}>
@@ -511,12 +492,27 @@ const Training = () => {
           )}
         </div>
 
+        {/* Trainers Section */}
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="rounded-xl border border-border bg-card p-5 shadow-card">
+          <h3 className="font-display text-base font-bold text-card-foreground flex items-center gap-2"><Users className="h-5 w-5 text-primary" />Our Training Instructors</h3>
+          <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            {trainers.map((t, i) => (
+              <button key={i} onClick={() => { setSelectedTrainer(t); setTrainerProfileOpen(true); }}
+                className="flex flex-col items-center gap-2 rounded-lg border border-border p-3 hover:bg-muted/50 transition-colors text-center">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary text-sm font-bold">{t.avatar}</div>
+                <p className="text-xs font-medium text-card-foreground leading-tight">{t.name}</p>
+                <p className="text-[10px] text-muted-foreground">{t.specialty.split(" & ")[0]}</p>
+              </button>
+            ))}
+          </div>
+        </motion.div>
+
         {/* Course Cards */}
         {isLoading ? (
           <div className="flex items-center justify-center py-16"><div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>
         ) : filteredCourses.length === 0 ? (
           <div className="text-center py-16 text-muted-foreground">
-            {courses.length === 0 ? "No courses available yet." : "No courses match your search."}
+            {courses.length === 0 ? "No courses available yet. Use 'Browse Internet' to find courses online." : "No courses match your search."}
           </div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -569,12 +565,90 @@ const Training = () => {
         )}
       </div>
 
+      {/* ===== USER PROFILE ===== */}
+      <Dialog open={userProfileOpen} onOpenChange={setUserProfileOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><User className="h-5 w-5 text-primary" /> My Training Profile</DialogTitle>
+            <DialogDescription>Your learning profile and achievements</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex items-center gap-4">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary text-xl font-bold">
+                {(profile?.full_name || user?.email || "U").charAt(0).toUpperCase()}
+              </div>
+              <div>
+                <p className="text-lg font-bold text-card-foreground">{profile?.full_name || user?.email || "Student"}</p>
+                <p className="text-sm text-muted-foreground">{user?.email}</p>
+                {profile?.district && <p className="text-xs text-muted-foreground">📍 {profile.district}</p>}
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="rounded-lg border border-border p-3 text-center">
+                <p className="text-xl font-bold text-primary">{completedCount}</p>
+                <p className="text-xs text-muted-foreground">Courses Done</p>
+              </div>
+              <div className="rounded-lg border border-border p-3 text-center">
+                <p className="text-xl font-bold text-primary">{allCertificates.length}</p>
+                <p className="text-xs text-muted-foreground">Certificates</p>
+              </div>
+              <div className="rounded-lg border border-border p-3 text-center">
+                <p className="text-xl font-bold text-primary">{Object.values(completedUnits).flat().length}</p>
+                <p className="text-xs text-muted-foreground">Units Done</p>
+              </div>
+            </div>
+            <div className="rounded-lg bg-muted/30 p-3">
+              <p className="text-xs font-medium text-card-foreground">Training Program</p>
+              <p className="text-xs text-muted-foreground mt-1">Moses AMS Company — Agricultural Management System</p>
+              <p className="text-xs text-muted-foreground">Member since: {new Date(user?.created_at || "").toLocaleDateString()}</p>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ===== TRAINER PROFILE ===== */}
+      <Dialog open={trainerProfileOpen} onOpenChange={setTrainerProfileOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Users className="h-5 w-5 text-primary" /> Trainer Profile</DialogTitle>
+          </DialogHeader>
+          {selectedTrainer && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-4">
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary text-primary-foreground text-xl font-bold">{selectedTrainer.avatar}</div>
+                <div>
+                  <p className="text-lg font-bold text-card-foreground">{selectedTrainer.name}</p>
+                  <p className="text-sm text-muted-foreground">{selectedTrainer.specialty}</p>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <div className="flex justify-between rounded-lg border border-border p-3">
+                  <span className="text-sm text-muted-foreground">Experience</span>
+                  <span className="text-sm font-medium text-card-foreground">{selectedTrainer.experience}</span>
+                </div>
+                <div className="flex justify-between rounded-lg border border-border p-3">
+                  <span className="text-sm text-muted-foreground">Institution</span>
+                  <span className="text-sm font-medium text-card-foreground">{selectedTrainer.institution}</span>
+                </div>
+                <div className="flex justify-between rounded-lg border border-border p-3">
+                  <span className="text-sm text-muted-foreground">Training Mode</span>
+                  <span className="text-sm font-medium text-card-foreground">Online</span>
+                </div>
+              </div>
+              <div className="rounded-lg bg-muted/30 p-3">
+                <p className="text-xs text-muted-foreground">This trainer provides online courses through Moses AMS Company's agricultural training platform.</p>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* ===== ONLINE READING LIBRARY ===== */}
       <Dialog open={readingListOpen} onOpenChange={setReadingListOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2"><FileText className="h-5 w-5 text-primary" /> Online Reading Library</DialogTitle>
-            <DialogDescription>Each book contains 9 content units with end-of-unit assessments</DialogDescription>
+            <DialogDescription>Each book contains 9 content units with end-of-unit assessments. Study 1hr+ to unlock assessments.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3 max-h-96 overflow-y-auto">
             {readingMaterials.map((book) => {
@@ -588,12 +662,13 @@ const Training = () => {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-card-foreground">{book.title}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">{book.description}</p>
-                    <div className="flex items-center gap-2 mt-1.5">
+                    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                       <Badge variant="outline" className="text-xs">{book.category}</Badge>
                       <span className="text-xs text-muted-foreground">9 units · {book.pages} pages</span>
                       {done > 0 && <Badge variant="secondary" className="text-xs">{done}/9 done</Badge>}
                       {hasCert && <Badge className="text-xs bg-success/10 text-success border-success/30">Certified ✓</Badge>}
                     </div>
+                    <p className="text-[10px] text-muted-foreground mt-1">👨‍🏫 Trainer: {book.trainer.name}</p>
                   </div>
                   <Button size="sm" onClick={() => openBookStudy(book)}>Study</Button>
                 </div>
@@ -603,8 +678,8 @@ const Training = () => {
         </DialogContent>
       </Dialog>
 
-      {/* ===== BOOK STUDY - 9 UNITS ===== */}
-      <Dialog open={studyOpen} onOpenChange={setStudyOpen}>
+      {/* ===== BOOK STUDY - 9 UNITS with timer ===== */}
+      <Dialog open={studyOpen} onOpenChange={(open) => { setStudyOpen(open); if (!open) setStudyStartTime(null); }}>
         <DialogContent className="max-w-2xl max-h-[85vh]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -614,6 +689,22 @@ const Training = () => {
               Unit {currentUnit + 1} of 9 — {getBookContents()[currentUnit]?.title}
             </DialogDescription>
           </DialogHeader>
+
+          {/* Study Timer */}
+          <div className={`flex items-center gap-2 rounded-lg p-2 text-sm ${hasStudiedEnough ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"}`}>
+            <Clock className="h-4 w-4" />
+            <span>Study time: {formatTime(studyElapsed)}</span>
+            {!hasStudiedEnough && <span className="text-xs ml-auto">Need 1hr to unlock assessment</span>}
+            {hasStudiedEnough && <span className="text-xs ml-auto">✅ Assessment unlocked!</span>}
+          </div>
+
+          {/* Trainer info */}
+          {studyBook?.trainer && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-primary text-[10px] font-bold">{studyBook.trainer.avatar}</div>
+              <span>Trainer: {studyBook.trainer.name} — {studyBook.trainer.specialty}</span>
+            </div>
+          )}
 
           {/* Unit Navigation */}
           <div className="flex gap-1 flex-wrap">
@@ -649,9 +740,9 @@ const Training = () => {
                 Next<ChevronRight className="h-4 w-4 ml-1" />
               </Button>
             </div>
-            <Button size="sm" onClick={startUnitAssessment}>
+            <Button size="sm" onClick={startUnitAssessment} disabled={!hasStudiedEnough}>
               <HelpCircle className="mr-1.5 h-4 w-4" />
-              End Unit Assessment
+              {hasStudiedEnough ? "End Unit Assessment" : "Study 1hr to unlock"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -666,30 +757,28 @@ const Training = () => {
             </DialogTitle>
             <DialogDescription>
               {getBookContents()[currentUnit]?.title} — {unitAssessmentDone ? "Results" : `Question ${unitQuestionIndex + 1} of ${getBookContents()[currentUnit]?.assessment.length || 3}`}
+              <br /><span className="text-xs">Pass mark: 50%</span>
             </DialogDescription>
           </DialogHeader>
-
           {unitAssessmentDone ? (
             <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="text-center py-6 space-y-4">
-              <div className={`mx-auto flex h-20 w-20 items-center justify-center rounded-full ${unitScore >= 70 ? "bg-success/10" : "bg-destructive/10"}`}>
-                {unitScore >= 70 ? <CheckCircle2 className="h-10 w-10 text-success" /> : <X className="h-10 w-10 text-destructive" />}
+              <div className={`mx-auto flex h-20 w-20 items-center justify-center rounded-full ${unitScore >= 50 ? "bg-success/10" : "bg-destructive/10"}`}>
+                {unitScore >= 50 ? <CheckCircle2 className="h-10 w-10 text-success" /> : <X className="h-10 w-10 text-destructive" />}
               </div>
               <div>
                 <h3 className="text-xl font-bold text-card-foreground">{unitScore}%</h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  {unitScore >= 70
+                  {unitScore >= 50
                     ? `✅ Unit ${currentUnit + 1} completed! ${studyBook ? `${getCompletedUnitsForBook(studyBook.id).length}/9 units done.` : ""}`
-                    : "You need 70% to pass. Study the material and try again."}
+                    : "You need 50% to pass. Study the material and try again."}
                 </p>
               </div>
               <div className="flex gap-2 justify-center">
-                {unitScore < 70 && (
-                  <Button variant="outline" onClick={() => { setUnitQuestionIndex(0); setUnitAnswers([]); setUnitSelectedAnswer(null); setUnitAssessmentDone(false); }}>
-                    Retry
-                  </Button>
+                {unitScore < 50 && (
+                  <Button variant="outline" onClick={() => { setUnitQuestionIndex(0); setUnitAnswers([]); setUnitSelectedAnswer(null); setUnitAssessmentDone(false); }}>Retry</Button>
                 )}
-                <Button onClick={() => { setUnitAssessmentOpen(false); if (unitScore >= 70 && currentUnit < 8) setCurrentUnit(currentUnit + 1); }}>
-                  {unitScore >= 70 && currentUnit < 8 ? "Next Unit →" : "Close"}
+                <Button onClick={() => { setUnitAssessmentOpen(false); if (unitScore >= 50 && currentUnit < 8) setCurrentUnit(currentUnit + 1); }}>
+                  {unitScore >= 50 && currentUnit < 8 ? "Next Unit →" : "Close"}
                 </Button>
               </div>
             </motion.div>
@@ -719,30 +808,32 @@ const Training = () => {
         </DialogContent>
       </Dialog>
 
-      {/* ===== COURSE QUIZ (DB courses) ===== */}
+      {/* ===== COURSE QUIZ ===== */}
       <Dialog open={quizOpen} onOpenChange={setQuizOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2"><HelpCircle className="h-5 w-5 text-primary" /> Course Quiz</DialogTitle>
-            <DialogDescription>{quizCourseTitle} — {quizCompleted ? "Results" : `Question ${currentQuestion + 1} of ${getQuizQuestions().length}`}</DialogDescription>
+            <DialogDescription>{quizCourseTitle} — {quizCompleted ? "Results" : `Question ${currentQuestion + 1} of ${getQuizQuestions().length}`}
+              <br /><span className="text-xs">Pass mark: 50%</span>
+            </DialogDescription>
           </DialogHeader>
           {quizCompleted ? (
             <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="text-center py-6 space-y-4">
-              <div className={`mx-auto flex h-20 w-20 items-center justify-center rounded-full ${score >= 70 ? "bg-success/10" : "bg-destructive/10"}`}>
-                {score >= 70 ? <Award className="h-10 w-10 text-success" /> : <X className="h-10 w-10 text-destructive" />}
+              <div className={`mx-auto flex h-20 w-20 items-center justify-center rounded-full ${score >= 50 ? "bg-success/10" : "bg-destructive/10"}`}>
+                {score >= 50 ? <Award className="h-10 w-10 text-success" /> : <X className="h-10 w-10 text-destructive" />}
               </div>
               <div>
                 <h3 className="text-xl font-bold text-card-foreground">{score}%</h3>
-                <p className="text-sm text-muted-foreground mt-1">{score >= 70 ? "🎉 You passed and earned a certificate!" : "You need 70% to pass."}</p>
+                <p className="text-sm text-muted-foreground mt-1">{score >= 50 ? "🎉 You passed and earned a certificate from Moses AMS Company!" : "You need 50% to pass."}</p>
               </div>
-              {score >= 70 && (
+              {score >= 50 && (
                 <div className="flex gap-2 justify-center flex-wrap">
                   <Button size="sm" onClick={() => downloadCertificate(quizCourseTitle)}><Download className="mr-1 h-4 w-4" />Download</Button>
                   <Button size="sm" variant="outline" onClick={() => openShare(quizCourseTitle)}><Share2 className="mr-1 h-4 w-4" />Share</Button>
                 </div>
               )}
               <div className="flex gap-2 justify-center">
-                {score < 70 && <Button variant="outline" onClick={() => { setCurrentQuestion(0); setAnswers([]); setSelectedAnswer(null); setQuizCompleted(false); }}>Retry</Button>}
+                {score < 50 && <Button variant="outline" onClick={() => { setCurrentQuestion(0); setAnswers([]); setSelectedAnswer(null); setQuizCompleted(false); }}>Retry</Button>}
                 <Button onClick={() => setQuizOpen(false)}>Close</Button>
               </div>
             </motion.div>
@@ -772,14 +863,14 @@ const Training = () => {
       <Dialog open={certDialogOpen} onOpenChange={setCertDialogOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><Award className="h-5 w-5 text-primary" /> My Certificates</DialogTitle>
+            <DialogTitle className="flex items-center gap-2"><Award className="h-5 w-5 text-primary" /> My Certificates — Moses AMS Company</DialogTitle>
             <DialogDescription>Certificates from completed courses and books</DialogDescription>
           </DialogHeader>
           {allCertificates.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <Award className="mx-auto h-12 w-12 mb-3 opacity-30" />
               <p className="font-medium">No certificates yet</p>
-              <p className="text-sm mt-1">Complete course quizzes or all 9 book units (70%+) to earn certificates!</p>
+              <p className="text-sm mt-1">Study for 1hr+, pass assessments (50%+) to earn certificates!</p>
             </div>
           ) : (
             <div className="space-y-3 max-h-80 overflow-y-auto">
@@ -808,20 +899,18 @@ const Training = () => {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2"><Award className="h-5 w-5 text-primary" /> Generate Certificate</DialogTitle>
-            <DialogDescription>Select a completed course or book to generate your certificate</DialogDescription>
+            <DialogDescription>Select a completed course or book to generate your Moses AMS Company certificate</DialogDescription>
           </DialogHeader>
           {allCertificates.length === 0 ? (
             <div className="text-center py-6 text-muted-foreground">
-              <p className="text-sm">Complete a course quiz or all 9 units of a book to generate a certificate.</p>
+              <p className="text-sm">Study for 1hr+, complete assessments with 50%+ score to generate a certificate.</p>
             </div>
           ) : (
             <div className="space-y-3">
               <Select value={certCourse} onValueChange={setCertCourse}>
                 <SelectTrigger><SelectValue placeholder="Select course/book" /></SelectTrigger>
                 <SelectContent>
-                  {allCertificates.map((cert, i) => (
-                    <SelectItem key={i} value={cert.title}>{cert.title}</SelectItem>
-                  ))}
+                  {allCertificates.map((cert, i) => <SelectItem key={i} value={cert.title}>{cert.title}</SelectItem>)}
                 </SelectContent>
               </Select>
               <DialogFooter className="flex-col sm:flex-row gap-2">
@@ -842,32 +931,26 @@ const Training = () => {
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2"><Share2 className="h-5 w-5 text-primary" /> Share Certificate</DialogTitle>
-            <DialogDescription>Share "{shareTitle}" certificate</DialogDescription>
+            <DialogDescription>Share "{shareTitle}" certificate from Moses AMS Company</DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-3">
             <Button variant="outline" className="flex flex-col items-center gap-2 h-auto py-4" onClick={() => handleShare("whatsapp", shareTitle)}>
-              <MessageCircle className="h-6 w-6 text-green-500" />
-              <span className="text-xs">WhatsApp</span>
+              <MessageCircle className="h-6 w-6 text-green-500" /><span className="text-xs">WhatsApp</span>
             </Button>
             <Button variant="outline" className="flex flex-col items-center gap-2 h-auto py-4" onClick={() => handleShare("facebook", shareTitle)}>
-              <Facebook className="h-6 w-6 text-blue-600" />
-              <span className="text-xs">Facebook</span>
+              <Facebook className="h-6 w-6 text-blue-600" /><span className="text-xs">Facebook</span>
             </Button>
             <Button variant="outline" className="flex flex-col items-center gap-2 h-auto py-4" onClick={() => handleShare("instagram", shareTitle)}>
-              <Instagram className="h-6 w-6 text-pink-500" />
-              <span className="text-xs">Instagram</span>
+              <Instagram className="h-6 w-6 text-pink-500" /><span className="text-xs">Instagram</span>
             </Button>
             <Button variant="outline" className="flex flex-col items-center gap-2 h-auto py-4" onClick={() => handleShare("email", shareTitle)}>
-              <Mail className="h-6 w-6 text-orange-500" />
-              <span className="text-xs">Email</span>
+              <Mail className="h-6 w-6 text-orange-500" /><span className="text-xs">Email</span>
             </Button>
             <Button variant="outline" className="flex flex-col items-center gap-2 h-auto py-4" onClick={() => handleShare("github", shareTitle)}>
-              <Github className="h-6 w-6" />
-              <span className="text-xs">GitHub</span>
+              <Github className="h-6 w-6" /><span className="text-xs">GitHub</span>
             </Button>
             <Button variant="outline" className="flex flex-col items-center gap-2 h-auto py-4" onClick={() => { downloadCertificate(shareTitle); setShareOpen(false); }}>
-              <Download className="h-6 w-6 text-primary" />
-              <span className="text-xs">Download</span>
+              <Download className="h-6 w-6 text-primary" /><span className="text-xs">Download</span>
             </Button>
           </div>
         </DialogContent>
