@@ -3,7 +3,7 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { motion } from "framer-motion";
 import {
-  CreditCard, Smartphone, Building2, CheckCircle2, Clock, ArrowUpRight, Shield, Banknote,
+  CreditCard, Smartphone, Building2, CheckCircle2, ArrowUpRight, Shield, Banknote,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -27,7 +27,7 @@ const paymentMethods = [
 ];
 
 const Payments = () => {
-  const { user, profile } = useAuth();
+  useAuth();
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<typeof subscriptionPlans[0] | null>(null);
   const [selectedMethod, setSelectedMethod] = useState<string>("");
